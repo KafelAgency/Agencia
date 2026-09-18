@@ -427,6 +427,13 @@
                                 <option value="">--- Cargando vendedores ---</option>
                             </select>
                         </div>
+                        <div class="form-group" id="groupEsLider">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 400;">
+                                <input type="checkbox" name="es_lider" style="width: 18px; height: 18px; cursor: pointer;">
+                                <span>👑 Registrar como Líder del Área</span>
+                            </label>
+                            <p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">El líder ganará 5% de todas las ventas/ganancias de su equipo</p>
+                        </div>
                         <button type="submit" class="btn" style="width: 100%; font-size: 16px;">Registrar</button>
                     </form>
                 </div>
@@ -762,14 +769,17 @@
 
                     var filasPromesas = vendedoresFiltrados.map(function(v) {
                         return APP.supabase.from('vendedores').select('*').eq('referido_de', v.id).then(function(r) {
-                            var categoria = v.nivel_comision === 1 ? '25%' : '30%';
+                            var categoria = v.es_lider ? '5% (Líder)' : (v.nivel_comision === 1 ? '25%' : '30%');
+                            var badgeClass = v.es_lider ? 'danger' : 'success';
                             var bono = v.bono_referido && parseFloat(v.bono_referido) > 0 ? '✓ +5%' : '-';
                             var referidos = r.data ? r.data.length : 0;
                             var referidosBadge = referidos > 0 ? '<span class="badge success">' + referidos + '</span>' : '-';
+                            var liderBadge = v.es_lider ? '👑 ' : '';
+                            var rowStyle = v.es_lider ? ' style="background: #f0f9ff; font-weight: 600;"' : '';
 
-                            return '<tr>' +
-                                '<td>' + v.nombre + '</td>' +
-                                '<td><span class="badge success">' + categoria + '</span></td>' +
+                            return '<tr' + rowStyle + '>' +
+                                '<td>' + liderBadge + v.nombre + '</td>' +
+                                '<td><span class="badge ' + badgeClass + '">' + categoria + '</span></td>' +
                                 '<td>' + (v.cantidad_ventas || 0) + '</td>' +
                                 '<td>' + bono + '</td>' +
                                 '<td>' + referidosBadge + '</td>' +
@@ -801,14 +811,17 @@
                         var referidos = results[1].data || [];
                         var referidoPor = results[2].data;
 
-                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal</h3>' +
+                        var liderBadge = v.es_lider ? '<span class="badge danger" style="margin-left: 10px;">👑 LÍDER DEL ÁREA</span>' : '';
+                        var comisionText = v.es_lider ? '5% de todas las ventas del equipo' : (v.nivel_comision === 1 ? '25%' : '30%');
+
+                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal ' + liderBadge + '</h3>' +
                             '<table style="font-size: 14px;"><tbody>' +
                             '<tr><td><strong>Nombre:</strong></td><td>' + v.nombre + '</td></tr>' +
                             '<tr><td><strong>Cédula:</strong></td><td>' + v.cedula + '</td></tr>' +
                             '<tr><td><strong>Correo:</strong></td><td>' + (v.correo || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Celular:</strong></td><td>' + (v.celular || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Fecha Contrato:</strong></td><td>' + v.fecha_contrato + '</td></tr>' +
-                            '<tr><td><strong>Comisión:</strong></td><td>' + (v.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>';
+                            '<tr><td><strong>Comisión:</strong></td><td>' + comisionText + '</td></tr>';
 
                         if (referidoPor) {
                             html += '<tr><td><strong>Referido de:</strong></td><td>' + referidoPor.nombre + ' ✓</td></tr>';
@@ -841,9 +854,13 @@
                         }
                         html += '</tbody></table></div>';
 
+                        var botonEliminar = v.es_lider ?
+                            '<button class="btn" style="background: #9ca3af; cursor: not-allowed;" disabled title="Los líderes no pueden ser eliminados">🔒 Protegido</button>' :
+                            '<button class="btn danger" onclick="APP.confirmarEliminacionVendedor(\'' + v.id + '\', \'' + v.nombre.replace(/'/g, "\\'") + '\', ' + v.es_lider + ')">🗑️ Eliminar</button>';
+
                         html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">' +
                             '<button class="btn secondary" onclick="APP.cerrarModal()">Cerrar</button>' +
-                            '<button class="btn danger" onclick="APP.confirmarEliminacionVendedor(\'' + v.id + '\', \'' + v.nombre.replace(/'/g, "\\'") + '\')">🗑️ Eliminar</button>' +
+                            botonEliminar +
                             '</div>';
 
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + v.nombre;
@@ -873,11 +890,14 @@
                     });
 
                     tbody.innerHTML = programadoresFiltrados.map(function(p) {
-                        var categoria = p.nivel_comision === 1 ? '25%' : '30%';
+                        var categoria = p.es_lider ? '5% (Líder)' : (p.nivel_comision === 1 ? '25%' : '30%');
+                        var badgeClass = p.es_lider ? 'danger' : 'success';
                         var bono = p.bono_referido && parseFloat(p.bono_referido) > 0 ? '✓ +5%' : '-';
-                        return '<tr>' +
-                            '<td>' + p.nombre + '</td>' +
-                            '<td><span class="badge success">' + categoria + '</span></td>' +
+                        var liderBadge = p.es_lider ? '👑 ' : '';
+                        var rowStyle = p.es_lider ? ' style="background: #f0f9ff; font-weight: 600;"' : '';
+                        return '<tr' + rowStyle + '>' +
+                            '<td>' + liderBadge + p.nombre + '</td>' +
+                            '<td><span class="badge ' + badgeClass + '">' + categoria + '</span></td>' +
                             '<td>' + (p.cantidad_proyectos || 0) + '</td>' +
                             '<td>' + bono + '</td>' +
                             '<td>$' + parseFloat(p.total_ganado || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
@@ -897,14 +917,17 @@
                     APP.supabase.from('proyectos').select('*').eq('id_programador', programadorId).then(function(r) {
                         var proyectos = r.data || [];
 
-                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal</h3>' +
+                        var liderBadge = p.es_lider ? '<span class="badge danger" style="margin-left: 10px;">👑 LÍDER DEL ÁREA</span>' : '';
+                        var comisionText = p.es_lider ? '5% de todas las ganancias del equipo' : (p.nivel_comision === 1 ? '25%' : '30%');
+
+                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal ' + liderBadge + '</h3>' +
                             '<table style="font-size: 14px;"><tbody>' +
                             '<tr><td><strong>Nombre:</strong></td><td>' + p.nombre + '</td></tr>' +
                             '<tr><td><strong>Cédula:</strong></td><td>' + p.cedula + '</td></tr>' +
                             '<tr><td><strong>Correo:</strong></td><td>' + (p.correo || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Celular:</strong></td><td>' + (p.celular || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Fecha Contrato:</strong></td><td>' + p.fecha_contrato + '</td></tr>' +
-                            '<tr><td><strong>Comisión:</strong></td><td>' + (p.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>' +
+                            '<tr><td><strong>Comisión:</strong></td><td>' + comisionText + '</td></tr>' +
                             '</tbody></table></div>';
 
                         html += '<div><h3 style="color: #1e40af; margin-bottom: 15px;">Historial de Proyectos (' + proyectos.length + ')</h3>' +
@@ -922,9 +945,13 @@
                         }
                         html += '</tbody></table></div>';
 
+                        var botonEliminar = p.es_lider ?
+                            '<button class="btn" style="background: #9ca3af; cursor: not-allowed;" disabled title="Los líderes no pueden ser eliminados">🔒 Protegido</button>' :
+                            '<button class="btn danger" onclick="APP.confirmarEliminacionProgramador(\'' + p.id + '\', \'' + p.nombre.replace(/'/g, "\\'") + '\', ' + p.es_lider + ')">🗑️ Eliminar</button>';
+
                         html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">' +
                             '<button class="btn secondary" onclick="APP.cerrarModal()">Cerrar</button>' +
-                            '<button class="btn danger" onclick="APP.confirmarEliminacionProgramador(\'' + p.id + '\', \'' + p.nombre.replace(/'/g, "\\'") + '\')">🗑️ Eliminar</button>' +
+                            botonEliminar +
                             '</div>';
 
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + p.nombre;
@@ -934,7 +961,12 @@
                 }).catch(function(e) { console.error(e); });
             },
 
-            confirmarEliminacionProgramador: function(programadorId, programadorNombre) {
+            confirmarEliminacionProgramador: function(programadorId, programadorNombre, esLider) {
+                if (esLider) {
+                    alert('⛔ No se puede eliminar un Líder. El perfil de líder es protegido y no puede ser modificado ni eliminado.');
+                    return;
+                }
+
                 var password = prompt('⚠️ Esta acción es irreversible. Ingresa la contraseña para confirmar la eliminación de ' + programadorNombre + ':');
                 if (!password) return;
 
@@ -1346,6 +1378,7 @@
                 var celular = form.querySelector('input[name="celular"]').value.trim();
                 var fechaContrato = form.querySelector('input[name="fecha_contrato"]').value.trim();
                 var referidoDe = form.querySelector('select[name="referido_de"]').value || null;
+                var esLider = form.querySelector('input[name="es_lider"]').checked;
 
                 if (!nombre || !cedula || !correo || !celular || !fechaContrato) {
                     alert('✗ Por favor completa todos los campos');
@@ -1358,32 +1391,66 @@
                     cedula: cedula,
                     correo: correo,
                     celular: celular,
-                    fecha_contrato: fechaContrato
+                    fecha_contrato: fechaContrato,
+                    es_lider: esLider
                 };
 
                 if (APP.tipoRegistroActual === 'vendedor') {
                     datos.referido_de = referidoDe;
-                    datos.nivel_comision = 1;
+                    datos.nivel_comision = esLider ? 2 : 1;
                     datos.total_ventas = 0;
                     datos.cantidad_ventas = 0;
                     datos.estado = 'activo';
                 }
 
+                if (esLider) {
+                    APP.supabase.from(tabla).select('es_lider').eq('es_lider', true).then(function(result) {
+                        if (result.error) throw result.error;
+                        if (result.data && result.data.length > 0) {
+                            alert('✗ Ya existe un líder registrado en esta área. Solo puede haber uno.');
+                            return;
+                        }
+                        APP.insertarUsuario(tabla, datos, form);
+                    }).catch(function(error) {
+                        console.error('Error al verificar líder:', error);
+                        alert('✗ Error: ' + error.message);
+                    });
+                } else {
+                    APP.insertarUsuario(tabla, datos, form);
+                }
+            },
+
+            insertarUsuario: function(tabla, datos, form) {
                 console.log('Registrando:', datos);
 
                 APP.supabase.from(tabla).insert([datos]).select().then(function(result) {
                     if (result.error) throw result.error;
                     console.log('✓ Usuario registrado:', result.data);
-                    alert('✓ ' + (APP.tipoRegistroActual === 'vendedor' ? 'Vendedor' : 'Programador') + ' registrado correctamente');
+                    var tipoUsuario = APP.tipoRegistroActual === 'vendedor' ? 'Vendedor' : 'Programador';
+                    if (datos.es_lider) {
+                        alert('✓ ' + tipoUsuario + ' Líder registrado correctamente\n👑 Comisión: 5% de todas las ventas/ganancias del equipo');
+                    } else {
+                        alert('✓ ' + tipoUsuario + ' registrado correctamente');
+                    }
                     form.reset();
                     APP.cargarListasSelect();
+                    if (APP.tipoRegistroActual === 'vendedor') {
+                        APP.cargarVendedores();
+                    } else {
+                        APP.cargarProgramadores();
+                    }
                 }).catch(function(error) {
                     console.error('Error:', error);
                     alert('✗ Error: ' + error.message);
                 });
             },
 
-            confirmarEliminacionVendedor: function(vendedorId, vendedorNombre) {
+            confirmarEliminacionVendedor: function(vendedorId, vendedorNombre, esLider) {
+                if (esLider) {
+                    alert('⛔ No se puede eliminar un Líder. El perfil de líder es protegido y no puede ser modificado ni eliminado.');
+                    return;
+                }
+
                 var password = prompt('⚠️ Esta acción es irreversible. Ingresa la contraseña para confirmar la eliminación de ' + vendedorNombre + ':');
                 if (!password) return;
 
