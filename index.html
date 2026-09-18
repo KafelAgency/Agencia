@@ -567,11 +567,13 @@
                 var sections = document.getElementsByClassName('section');
                 for (var i = 0; i < sections.length; i++) {
                     sections[i].classList.remove('active');
+                    sections[i].style.display = 'none';
                 }
 
                 var sectionElement = document.getElementById(seccion);
                 if (sectionElement) {
                     sectionElement.classList.add('active');
+                    sectionElement.style.display = 'block';
                 }
 
                 var navItems = document.getElementsByClassName('nav-item');
