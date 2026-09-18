@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAFEL Agency - Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; background: #f9fafb; color: #111827; }
+
+        .container { display: flex; height: 100vh; }
+        .sidebar { width: 280px; background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); color: white; padding: 20px; overflow-y: auto; position: fixed; height: 100vh; left: 0; }
+        .main { margin-left: 280px; flex: 1; padding: 30px; overflow-y: auto; }
+
+        .sidebar h2 { margin-bottom: 10px; font-size: 20px; }
+        .sidebar p { font-size: 12px; opacity: 0.8; margin-bottom: 20px; }
+        .nav-item { padding: 12px 15px; margin: 8px 0; border-radius: 8px; cursor: pointer; background: transparent; color: white; border: none; text-align: left; width: 100%; font-size: 14px; transition: all 0.2s; }
+        .nav-item:hover { background: rgba(255,255,255,0.15); }
+        .nav-item.active { background: rgba(255,255,255,0.25); font-weight: 600; }
+
+        .section { display: none; }
+        .section.active { display: block; animation: fadeIn 0.2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        h1 { color: #1e40af; margin-bottom: 25px; font-size: 28px; }
+        h2 { color: #374151; margin: 20px 0 15px 0; font-size: 18px; }
+
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-box { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-left: 4px solid #1e40af; }
+        .stat-box h3 { font-size: 13px; opacity: 0.7; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-box .value { font-size: 32px; font-weight: 700; color: #1e40af; }
+        .stat-box.alt-1 { border-left-color: #16a34a; }
+        .stat-box.alt-1 .value { color: #16a34a; }
+        .stat-box.alt-2 { border-left-color: #dc2626; }
+        .stat-box.alt-2 .value { color: #dc2626; }
+        .stat-box.alt-3 { border-left-color: #9333ea; }
+        .stat-box.alt-3 .value { color: #9333ea; }
+
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        table th { background: #f3f4f6; padding: 15px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #374151; font-size: 13px; }
+        table td { padding: 15px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        table tbody tr { transition: background 0.2s; }
+        table tbody tr:hover { background: #f9fafb; }
+
+        .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .badge.success { background: #d1fae5; color: #065f46; }
+        .badge.pending { background: #fef3c7; color: #92400e; }
+        .badge.danger { background: #fee2e2; color: #991b1b; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; background: #1e40af; color: white; font-size: 14px; transition: all 0.2s; }
+        .btn:hover { background: #1e3a8a; }
+        .btn.secondary { background: #6b7280; color: white; }
+        .btn.secondary:hover { background: #4b5563; }
+        .btn.danger { background: #dc2626; }
+        .btn.danger:hover { background: #b91c1c; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #374151; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-family: inherit; font-size: 14px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #1e40af; box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1); }
+
+        .alert { padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; }
+        .alert-info { background: #dbeafe; color: #0c4a6e; border-left: 4px solid #0284c7; }
+        .alert-success { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981; }
+        .alert-error { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal.active { display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px rgba(0,0,0,0.15); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 15px; }
+        .modal-header h2 { margin: 0; color: #1e40af; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; }
+
+        .search-filter { display: flex; gap: 15px; margin-bottom: 20px; }
+        .search-filter input { flex: 1; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; }
+
+        .no-data { text-align: center; padding: 40px; color: #9ca3af; }
+
+        .chart-container { position: relative; height: 300px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <h2>📊 KAFEL</h2>
+            <p>Admin Dashboard v2.0</p>
+            <div id="estado-conexion" class="alert alert-info" style="margin-bottom: 20px; border: none;">⏳ Conectando...</div>
+
+            <button class="nav-item active" onclick="APP.mostrarSeccion('dashboard')">📊 Dashboard</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('ventas')">💰 Ventas</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('vendedores')">👥 Vendedores</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('programadores')">💻 Programadores</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('clientes')">📋 Clientes</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('distribucion')">📈 Distribución</button>
+            <button class="nav-item" onclick="APP.mostrarSeccion('registrar')">➕ Registrar</button>
+            <button class="nav-item" onclick="location.reload()" style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px;">🚪 Salir</button>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main">
+
+            <!-- DASHBOARD -->
+            <div id="dashboard" class="section active">
+                <h1>📊 Dashboard Principal</h1>
+
+                <div class="stats">
+                    <div class="stat-box">
+                        <h3>Vendedores</h3>
+                        <div class="value" id="total-vendedores">0</div>
+                    </div>
+                    <div class="stat-box alt-1">
+                        <h3>Programadores</h3>
+                        <div class="value" id="total-programadores">0</div>
+                    </div>
+                    <div class="stat-box alt-2">
+                        <h3>Clientes</h3>
+                        <div class="value" id="total-clientes">0</div>
+                    </div>
+                    <div class="stat-box alt-3">
+                        <h3>Ganancias (Mes)</h3>
+                        <div class="value" id="total-ganancias">$0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Ventas por Categoría de Producto</h2>
+                    <div class="chart-container">
+                        <canvas id="chartProductos"></canvas>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="card">
+                        <h2>Top 5 Vendedores</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Vendedor</th>
+                                    <th>Ventas</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topVendedoresTable">
+                                <tr><td colspan="3" class="no-data">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="card">
+                        <h2>Resumen del Mes</h2>
+                        <table>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Total Ventas:</strong></td>
+                                    <td style="text-align: right; color: #1e40af; font-weight: 600;" id="resumenTotalVentas">$0</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Número de Ventas:</strong></td>
+                                    <td style="text-align: right;" id="resumenNumeroVentas">0</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Promedio por Venta:</strong></td>
+                                    <td style="text-align: right;" id="resumenPromedio">$0</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Donaciones:</strong></td>
+                                    <td style="text-align: right;" id="resumenDonaciones">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VENTAS -->
+            <div id="ventas" class="section">
+                <h1>💰 Todas las Ventas</h1>
+
+                <div class="card">
+                    <div class="search-filter">
+                        <input type="text" id="filtroVentasEmpresa" placeholder="Buscar por empresa...">
+                        <select id="filtroVentasVendedor">
+                            <option value="">Todos los vendedores</option>
+                        </select>
+                        <select id="filtroVentasEstado">
+                            <option value="">Todos los estados</option>
+                            <option value="pendiente">Pendiente</option>
+                            <option value="40%_pago">40% Pagado</option>
+                            <option value="100%_pago">100% Pagado</option>
+                            <option value="entregado">Entregado</option>
+                        </select>
+                        <button class="btn secondary" onclick="APP.limpiarFiltrosVentas()">Limpiar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Empresa</th>
+                                <th>Encargado</th>
+                                <th>Producto</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                                <th>Vendedor</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ventasTable">
+                            <tr><td colspan="7" class="no-data">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VENDEDORES -->
+            <div id="vendedores" class="section">
+                <h1>👥 Vendedores</h1>
+
+                <div class="card">
+                    <div class="search-filter">
+                        <input type="text" id="filtroVendedor" placeholder="Buscar vendedor...">
+                        <button class="btn secondary" onclick="APP.limpiarFiltrosVendedor()">Limpiar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Ventas</th>
+                                <th>Bono</th>
+                                <th>Total Ganado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendedoresTable">
+                            <tr><td colspan="6" class="no-data">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PROGRAMADORES -->
+            <div id="programadores" class="section">
+                <h1>💻 Programadores</h1>
+
+                <div class="card">
+                    <div class="search-filter">
+                        <input type="text" id="filtroProgramador" placeholder="Buscar programador...">
+                        <button class="btn secondary" onclick="APP.limpiarFiltrosProgramador()">Limpiar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo</th>
+                                <th>Proyectos</th>
+                                <th>Comisión</th>
+                                <th>Total Ganado</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="programadoresTable">
+                            <tr><td colspan="6" class="no-data">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CLIENTES -->
+            <div id="clientes" class="section">
+                <h1>📋 Clientes</h1>
+
+                <div class="card">
+                    <div class="search-filter">
+                        <input type="text" id="filtroCliente" placeholder="Buscar cliente o empresa...">
+                        <button class="btn secondary" onclick="APP.limpiarFiltrosCliente()">Limpiar</button>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Empresa</th>
+                                <th>Encargado</th>
+                                <th>Contacto</th>
+                                <th>Instagram</th>
+                                <th>Producto</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clientesTable">
+                            <tr><td colspan="6" class="no-data">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DISTRIBUCIÓN -->
+            <div id="distribucion" class="section">
+                <h1>📈 Distribución de Ingresos</h1>
+
+                <div class="card">
+                    <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <label style="font-weight: 600; display: block; margin-bottom: 5px;">Selecciona Mes:</label>
+                            <input type="month" id="mesSelector" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;">
+                        </div>
+                        <button onclick="APP.cargarDistribucion()" class="btn" style="margin-top: 20px;">Cargar</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 style="color: #1e40af; margin-bottom: 15px;">Total Ventas del Mes: <span id="totalVentasDistribucion">$0</span></h2>
+
+                    <div class="stats">
+                        <div class="stat-box">
+                            <h3>Operaciones (5%)</h3>
+                            <div class="value" id="distOperaciones">$0</div>
+                        </div>
+                        <div class="stat-box" style="border-left-color: #7c3aed;">
+                            <h3>Inversor (5%)</h3>
+                            <div class="value" id="distInversor" style="color: #7c3aed;">$0</div>
+                        </div>
+                        <div class="stat-box alt-3">
+                            <h3>Fondo KAFEL (20%)</h3>
+                            <div class="value" id="distFondoKafel">$0</div>
+                        </div>
+                        <div class="stat-box alt-1">
+                            <h3>Vendedores</h3>
+                            <div class="value" id="distVendedores">$0</div>
+                        </div>
+                        <div class="stat-box" style="border-left-color: #ec4899;">
+                            <h3>Programadores (30%)</h3>
+                            <div class="value" id="distProgramadores" style="color: #ec4899;">$0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>📊 Gráfico de Distribución</h2>
+                    <div class="chart-container">
+                        <canvas id="chartDistribucion"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>💰 Fondo KAFEL</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th>Monto</th>
+                                <th>Porcentaje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Ingreso Fondo KAFEL (Este Mes)</td>
+                                <td id="fondoKafelMes">$0</td>
+                                <td>20%</td>
+                            </tr>
+                            <tr style="background: #f3f4f6; font-weight: bold;">
+                                <td>Total Acumulado (Fondo KAFEL)</td>
+                                <td id="fondoKafelTotal">$0</td>
+                                <td>100%</td>
+                            </tr>
+                            <tr>
+                                <td>Miguel (60% del Fondo)</td>
+                                <td id="fondoKafelMiguel">$0</td>
+                                <td>60%</td>
+                            </tr>
+                            <tr>
+                                <td>Memo (40% del Fondo)</td>
+                                <td id="fondoKafelMemo">$0</td>
+                                <td>40%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- REGISTRAR -->
+            <div id="registrar" class="section">
+                <h1>➕ Registrar Nuevo Usuario</h1>
+                <div class="card" style="max-width: 600px;">
+                    <div style="margin-bottom: 25px;">
+                        <label style="font-weight: 600; color: #374151; margin-bottom: 10px; display: block;">¿Qué tipo de usuario?</label>
+                        <div style="display: flex; gap: 15px;">
+                            <button id="btnVendedor" class="btn" onclick="APP.cambiarTipoRegistro('vendedor')" style="flex: 1;">👥 Vendedor</button>
+                            <button id="btnProgramador" class="btn secondary" onclick="APP.cambiarTipoRegistro('programador')" style="flex: 1;">💻 Programador</button>
+                        </div>
+                    </div>
+
+                    <form id="formRegistro" onsubmit="APP.registrarUsuario(event)">
+                        <div class="form-group">
+                            <label>Nombre Completo *</label>
+                            <input type="text" name="nombre" placeholder="Juan García" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cédula *</label>
+                            <input type="text" name="cedula" placeholder="1234567890" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Correo *</label>
+                            <input type="email" name="correo" placeholder="juan@email.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Celular *</label>
+                            <input type="tel" name="celular" placeholder="+57 300 123 4567" required>
+                        </div>
+                        <div class="form-group" id="groupFechaContrato">
+                            <label>Fecha de Contrato *</label>
+                            <input type="date" name="fecha_contrato" required>
+                        </div>
+                        <div class="form-group" id="groupReferido">
+                            <label>¿Es referido de alguien?</label>
+                            <select name="referido_de">
+                                <option value="">No, es nuevo</option>
+                                <option value="">--- Cargando vendedores ---</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn" style="width: 100%; font-size: 16px;">Registrar</button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL PARA DETALLES -->
+    <div id="modalDetalles" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitulo">Detalles</h2>
+                <button class="modal-close" onclick="APP.cerrarModal()">&times;</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        var APP = {
+            supabase: null,
+            SUPABASE_URL: 'https://vkagxzxthfwxmfcwlvrr.supabase.co',
+            SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZrYWd4enh0aGZ3eG1mY3dsdnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MDA5NDcsImV4cCI6MjEwNTI3Njk0N30.iCb1cVtFoSE7KtuNagJls8nrU4lNI_vR7gkNXecNPkc',
+            tipoRegistroActual: 'vendedor',
+
+            inicializarSupabase: function() {
+                console.log('Inicializando Supabase...');
+
+                if (!window.supabase) {
+                    console.error('Librería de Supabase no cargada');
+                    document.getElementById('estado-conexion').innerHTML = '✗ Error: Supabase no cargada';
+                    document.getElementById('estado-conexion').style.background = '#fee2e2';
+                    return;
+                }
+
+                try {
+                    APP.supabase = window.supabase.createClient(APP.SUPABASE_URL, APP.SUPABASE_KEY);
+                    console.log('✓ Cliente de Supabase creado');
+
+                    APP.supabase.from('vendedores').select('count', { count: 'exact' }).then(function(result) {
+                        if (result.error) {
+                            throw result.error;
+                        }
+                        console.log('✓ Supabase conectado');
+                        document.getElementById('estado-conexion').innerHTML = '✓ Conectado';
+                        document.getElementById('estado-conexion').style.background = '#d1fae5';
+
+                        APP.cargarDashboard();
+                        APP.cargarListasSelect();
+                    }).catch(function(error) {
+                        console.error('Error de conexión:', error);
+                        document.getElementById('estado-conexion').innerHTML = '✗ Error: ' + error.message;
+                        document.getElementById('estado-conexion').style.background = '#fee2e2';
+                    });
+                } catch (error) {
+                    console.error('Error inicializando Supabase:', error);
+                    document.getElementById('estado-conexion').innerHTML = '✗ Error: ' + error.message;
+                    document.getElementById('estado-conexion').style.background = '#fee2e2';
+                }
+            },
+
+            mostrarSeccion: function(seccion) {
+                console.log('Mostrando sección:', seccion);
+
+                var sections = document.getElementsByClassName('section');
+                for (var i = 0; i < sections.length; i++) {
+                    sections[i].classList.remove('active');
+                }
+
+                var sectionElement = document.getElementById(seccion);
+                if (sectionElement) {
+                    sectionElement.classList.add('active');
+                }
+
+                var navItems = document.getElementsByClassName('nav-item');
+                for (var i = 0; i < navItems.length; i++) {
+                    navItems[i].classList.remove('active');
+                }
+
+                if (event && event.target) {
+                    event.target.classList.add('active');
+                }
+
+                if (seccion === 'vendedores') {
+                    APP.cargarVendedores();
+                } else if (seccion === 'programadores') {
+                    APP.cargarProgramadores();
+                } else if (seccion === 'ventas') {
+                    APP.cargarVentas();
+                } else if (seccion === 'clientes') {
+                    APP.cargarClientes();
+                } else if (seccion === 'distribucion') {
+                    var hoy = new Date();
+                    var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+                    document.getElementById('mesSelector').value = mesActual;
+                    APP.cargarDistribucion();
+                }
+            },
+
+            cargarDashboard: function() {
+                console.log('Cargando dashboard...');
+
+                if (!APP.supabase) return;
+
+                APP.supabase.from('vendedores').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    document.getElementById('total-vendedores').textContent = (result.data || []).length;
+                }).catch(function(e) { console.error(e); });
+
+                APP.supabase.from('clientes').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    document.getElementById('total-clientes').textContent = (result.data || []).length;
+                }).catch(function(e) { console.error(e); });
+
+                var hoy = new Date();
+                var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
+                APP.supabase.from('ventas')
+                    .select('monto_total')
+                    .gte('fecha_venta', mesActual + '-01')
+                    .lt('fecha_venta', (hoy.getMonth() === 11 ? (hoy.getFullYear() + 1) : hoy.getFullYear()) + '-' + String((hoy.getMonth() + 2) % 12 || 12).padStart(2, '0') + '-01')
+                    .then(function(result) {
+                        if (result.error) throw result.error;
+                        var ventas = result.data || [];
+                        var total = ventas.reduce(function(sum, v) { return sum + parseFloat(v.monto_total || 0); }, 0);
+                        document.getElementById('total-ganancias').textContent = '$' + total.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                        document.getElementById('resumenTotalVentas').textContent = '$' + total.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('resumenNumeroVentas').textContent = ventas.length;
+                        document.getElementById('resumenPromedio').textContent = '$' + (total / (ventas.length || 1)).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                    }).catch(function(e) { console.error(e); });
+            },
+
+            cargarListasSelect: function() {
+                if (!APP.supabase) return;
+
+                APP.supabase.from('vendedores').select('id, nombre').then(function(result) {
+                    if (result.error) throw result.error;
+                    var vendedores = result.data || [];
+
+                    var selectVendedor = document.querySelector('select[name="referido_de"]');
+                    selectVendedor.innerHTML = '<option value="">No, es nuevo</option>';
+                    vendedores.forEach(function(v) {
+                        var opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = v.nombre;
+                        selectVendedor.appendChild(opt);
+                    });
+
+                    var selectVendedorFiltro = document.getElementById('filtroVentasVendedor');
+                    selectVendedorFiltro.innerHTML = '<option value="">Todos los vendedores</option>';
+                    vendedores.forEach(function(v) {
+                        var opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = v.nombre;
+                        selectVendedorFiltro.appendChild(opt);
+                    });
+                }).catch(function(e) { console.error(e); });
+            },
+
+            cargarVendedores: function() {
+                console.log('Cargando vendedores...');
+                if (!APP.supabase) return;
+
+                APP.supabase.from('vendedores').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    var vendedores = result.data || [];
+                    var tbody = document.getElementById('vendedoresTable');
+
+                    if (vendedores.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No hay vendedores registrados</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = vendedores.map(function(v) {
+                        var categoria = v.nivel_comision === 1 ? '25%' : '30%';
+                        var bono = v.bono_referido && parseFloat(v.bono_referido) > 0 ? '✓ +5%' : '-';
+                        return '<tr>' +
+                            '<td>' + v.nombre + '</td>' +
+                            '<td><span class="badge success">' + categoria + '</span></td>' +
+                            '<td>' + (v.cantidad_ventas || 0) + '</td>' +
+                            '<td>' + bono + '</td>' +
+                            '<td>$' + parseFloat(v.total_ventas || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                            '<td><button class="btn" onclick="APP.verDetallesVendedor(\'' + v.id + '\')" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>' +
+                        '</tr>';
+                    }).join('');
+                }).catch(function(e) { console.error(e); });
+            },
+
+            verDetallesVendedor: function(vendedorId) {
+                if (!APP.supabase) return;
+
+                APP.supabase.from('vendedores').select('*').eq('id', vendedorId).single().then(function(result) {
+                    if (result.error) throw result.error;
+                    var v = result.data;
+
+                    APP.supabase.from('ventas').select('*').eq('id_vendedor', vendedorId).then(function(r) {
+                        var ventas = r.data || [];
+
+                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal</h3>' +
+                            '<table style="font-size: 14px;"><tbody>' +
+                            '<tr><td><strong>Nombre:</strong></td><td>' + v.nombre + '</td></tr>' +
+                            '<tr><td><strong>Cédula:</strong></td><td>' + v.cedula + '</td></tr>' +
+                            '<tr><td><strong>Correo:</strong></td><td>' + (v.correo || 'N/A') + '</td></tr>' +
+                            '<tr><td><strong>Celular:</strong></td><td>' + (v.celular || 'N/A') + '</td></tr>' +
+                            '<tr><td><strong>Fecha Contrato:</strong></td><td>' + v.fecha_contrato + '</td></tr>' +
+                            '<tr><td><strong>Comisión:</strong></td><td>' + (v.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>' +
+                            '</tbody></table></div>';
+
+                        html += '<div><h3 style="color: #1e40af; margin-bottom: 15px;">Historial de Ventas (' + ventas.length + ')</h3>' +
+                            '<table><thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead><tbody>';
+
+                        if (ventas.length === 0) {
+                            html += '<tr><td colspan="3" class="no-data">Sin ventas registradas</td></tr>';
+                        } else {
+                            ventas.forEach(function(vta) {
+                                var badge = 'pending';
+                                if (vta.estado_pago === '100%_pago') badge = 'success';
+                                html += '<tr><td>' + vta.fecha_venta + '</td><td>$' + parseFloat(vta.monto_total).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                                    '<td><span class="badge ' + badge + '">' + vta.estado_pago + '</span></td></tr>';
+                            });
+                        }
+                        html += '</tbody></table></div>';
+
+                        document.getElementById('modalTitulo').textContent = 'Detalles de ' + v.nombre;
+                        document.getElementById('modalBody').innerHTML = html;
+                        document.getElementById('modalDetalles').classList.add('active');
+                    });
+                }).catch(function(e) { console.error(e); });
+            },
+
+            cargarProgramadores: function() {
+                console.log('Cargando programadores...');
+                if (!APP.supabase) return;
+
+                var tbody = document.getElementById('programadoresTable');
+                tbody.innerHTML = '<tr><td colspan="6" class="no-data">Función en desarrollo</td></tr>';
+            },
+
+            cargarVentas: function() {
+                console.log('Cargando ventas...');
+                if (!APP.supabase) return;
+
+                APP.supabase.from('ventas').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    var ventas = result.data || [];
+                    var tbody = document.getElementById('ventasTable');
+
+                    if (ventas.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No hay ventas registradas</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = ventas.map(function(vta) {
+                        var badge = 'pending';
+                        if (vta.estado_pago === '100%_pago') badge = 'success';
+                        if (vta.estado_pago === '40%_pago') badge = 'pending';
+                        return '<tr>' +
+                            '<td>Empresa</td>' +
+                            '<td>Encargado</td>' +
+                            '<td>' + vta.descripcion_servicio + '</td>' +
+                            '<td>$' + parseFloat(vta.monto_total).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                            '<td><span class="badge ' + badge + '">' + vta.estado_pago + '</span></td>' +
+                            '<td>Vendedor</td>' +
+                            '<td>' + vta.fecha_venta + '</td>' +
+                        '</tr>';
+                    }).join('');
+                }).catch(function(e) { console.error(e); });
+            },
+
+            cargarClientes: function() {
+                console.log('Cargando clientes...');
+                if (!APP.supabase) return;
+
+                APP.supabase.from('clientes').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    var clientes = result.data || [];
+                    var tbody = document.getElementById('clientesTable');
+
+                    if (clientes.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No hay clientes registrados</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = clientes.map(function(c) {
+                        return '<tr>' +
+                            '<td>' + (c.nombre_empresa || 'N/A') + '</td>' +
+                            '<td>' + (c.nombre_completo || 'N/A') + '</td>' +
+                            '<td>' + (c.telefono || 'N/A') + '</td>' +
+                            '<td>' + (c.redes_sociales || 'N/A') + '</td>' +
+                            '<td>' + (c.tipo_cliente || 'cliente') + '</td>' +
+                            '<td><span class="badge success">Activo</span></td>' +
+                        '</tr>';
+                    }).join('');
+                }).catch(function(e) { console.error(e); });
+            },
+
+            cargarDistribucion: function() {
+                console.log('Cargando distribución...');
+                if (!APP.supabase) return;
+
+                var mes = document.getElementById('mesSelector').value;
+                if (!mes) {
+                    alert('Selecciona un mes');
+                    return;
+                }
+
+                var mesInicio = mes + '-01';
+                var parts = mes.split('-');
+                var siguiente = new Date(parts[0], parts[1], 1);
+                siguiente.setMonth(siguiente.getMonth() + 1);
+                var mesFinalizacion = siguiente.getFullYear() + '-' + String(siguiente.getMonth() + 1).padStart(2, '0') + '-01';
+
+                APP.supabase.from('ventas')
+                    .select('monto_total')
+                    .gte('fecha_venta', mesInicio)
+                    .lt('fecha_venta', mesFinalizacion)
+                    .then(function(result) {
+                        if (result.error) throw result.error;
+
+                        var ventas = result.data || [];
+                        var totalVentas = ventas.reduce(function(sum, v) { return sum + parseFloat(v.monto_total || 0); }, 0);
+
+                        var distribucion = {
+                            operaciones: totalVentas * 0.05,
+                            inversor: totalVentas * 0.05,
+                            fondoKafel: totalVentas * 0.20,
+                            vendedores: totalVentas * 0.35,
+                            programadores: totalVentas * 0.30
+                        };
+
+                        document.getElementById('totalVentasDistribucion').textContent = '$' + totalVentas.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('distOperaciones').textContent = '$' + distribucion.operaciones.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('distInversor').textContent = '$' + distribucion.inversor.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('distFondoKafel').textContent = '$' + distribucion.fondoKafel.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('distVendedores').textContent = '$' + distribucion.vendedores.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('distProgramadores').textContent = '$' + distribucion.programadores.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('fondoKafelMes').textContent = '$' + distribucion.fondoKafel.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+
+                        var fondoMiguel = distribucion.fondoKafel * 0.60;
+                        var fondoMemo = distribucion.fondoKafel * 0.40;
+                        document.getElementById('fondoKafelMiguel').textContent = '$' + fondoMiguel.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('fondoKafelMemo').textContent = '$' + fondoMemo.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                        document.getElementById('fondoKafelTotal').textContent = '$' + (distribucion.fondoKafel * 10).toLocaleString('es-CO', { maximumFractionDigits: 2 });
+
+                        APP.actualizarGraficoDistribucion(distribucion);
+                    }).catch(function(e) { console.error(e); });
+            },
+
+            actualizarGraficoDistribucion: function(distribucion) {
+                var ctx = document.getElementById('chartDistribucion');
+                if (!ctx) return;
+
+                if (window.chartDistribucionInstance) {
+                    window.chartDistribucionInstance.destroy();
+                }
+
+                var total = distribucion.operaciones + distribucion.inversor + distribucion.fondoKafel + distribucion.vendedores + distribucion.programadores;
+
+                window.chartDistribucionInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Operaciones (5%)', 'Inversor (5%)', 'Fondo KAFEL (20%)', 'Vendedores (35%)', 'Programadores (30%)'],
+                        datasets: [{
+                            data: [
+                                distribucion.operaciones,
+                                distribucion.inversor,
+                                distribucion.fondoKafel,
+                                distribucion.vendedores,
+                                distribucion.programadores
+                            ],
+                            backgroundColor: ['#3b82f6', '#a78bfa', '#9333ea', '#16a34a', '#ec4899'],
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        var label = context.label || '';
+                                        if (label) label += ': ';
+                                        label += '$' + context.parsed.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                                        label += ' (' + ((context.parsed / total) * 100).toFixed(1) + '%)';
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            },
+
+            cambiarTipoRegistro: function(tipo) {
+                APP.tipoRegistroActual = tipo;
+                var btnV = document.getElementById('btnVendedor');
+                var btnP = document.getElementById('btnProgramador');
+
+                if (tipo === 'vendedor') {
+                    btnV.className = 'btn';
+                    btnP.className = 'btn secondary';
+                    document.getElementById('groupFechaContrato').style.display = 'block';
+                    document.getElementById('groupReferido').style.display = 'block';
+                } else {
+                    btnV.className = 'btn secondary';
+                    btnP.className = 'btn';
+                    document.getElementById('groupFechaContrato').style.display = 'block';
+                    document.getElementById('groupReferido').style.display = 'none';
+                }
+            },
+
+            registrarUsuario: function(e) {
+                e.preventDefault();
+                if (!APP.supabase) {
+                    alert('✗ Supabase no está conectado');
+                    return;
+                }
+
+                var form = e.target;
+                var nombre = form.querySelector('input[name="nombre"]').value.trim();
+                var cedula = form.querySelector('input[name="cedula"]').value.trim();
+                var correo = form.querySelector('input[name="correo"]').value.trim();
+                var celular = form.querySelector('input[name="celular"]').value.trim();
+                var fechaContrato = form.querySelector('input[name="fecha_contrato"]').value.trim();
+                var referidoDe = form.querySelector('select[name="referido_de"]').value || null;
+
+                if (!nombre || !cedula || !correo || !celular || !fechaContrato) {
+                    alert('✗ Por favor completa todos los campos');
+                    return;
+                }
+
+                var tabla = APP.tipoRegistroActual === 'vendedor' ? 'vendedores' : 'programadores';
+                var datos = {
+                    nombre: nombre,
+                    cedula: cedula,
+                    correo: correo,
+                    celular: celular,
+                    fecha_contrato: fechaContrato
+                };
+
+                if (APP.tipoRegistroActual === 'vendedor') {
+                    datos.referido_de = referidoDe;
+                    datos.nivel_comision = 1;
+                    datos.total_ventas = 0;
+                    datos.cantidad_ventas = 0;
+                    datos.estado = 'activo';
+                }
+
+                console.log('Registrando:', datos);
+
+                APP.supabase.from(tabla).insert([datos]).select().then(function(result) {
+                    if (result.error) throw result.error;
+                    console.log('✓ Usuario registrado:', result.data);
+                    alert('✓ ' + (APP.tipoRegistroActual === 'vendedor' ? 'Vendedor' : 'Programador') + ' registrado correctamente');
+                    form.reset();
+                    APP.cargarListasSelect();
+                }).catch(function(error) {
+                    console.error('Error:', error);
+                    alert('✗ Error: ' + error.message);
+                });
+            },
+
+            cerrarModal: function() {
+                document.getElementById('modalDetalles').classList.remove('active');
+            },
+
+            limpiarFiltrosVendedor: function() {
+                document.getElementById('filtroVendedor').value = '';
+                APP.cargarVendedores();
+            },
+
+            limpiarFiltrosVentas: function() {
+                document.getElementById('filtroVentasEmpresa').value = '';
+                document.getElementById('filtroVentasVendedor').value = '';
+                document.getElementById('filtroVentasEstado').value = '';
+                APP.cargarVentas();
+            },
+
+            limpiarFiltrosProgramador: function() {
+                document.getElementById('filtroProgramador').value = '';
+                APP.cargarProgramadores();
+            },
+
+            limpiarFiltrosCliente: function() {
+                document.getElementById('filtroCliente').value = '';
+                APP.cargarClientes();
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Documento cargado, inicializando...');
+            APP.inicializarSupabase();
+        });
+    </script>
+</body>
+</html>
