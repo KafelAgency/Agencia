@@ -235,6 +235,7 @@
                                 <th>Categoría</th>
                                 <th>Ventas</th>
                                 <th>Bono</th>
+                                <th>Referidos</th>
                                 <th>Total Ganado</th>
                                 <th>Acción</th>
                             </tr>
@@ -750,7 +751,7 @@
                     var tbody = document.getElementById('vendedoresTable');
 
                     if (vendedores.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No hay vendedores registrados</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No hay vendedores registrados</td></tr>';
                         return;
                     }
 
@@ -759,18 +760,28 @@
                         return !filtro || v.nombre.toLowerCase().includes(filtro);
                     });
 
-                    tbody.innerHTML = vendedoresFiltrados.map(function(v) {
-                        var categoria = v.nivel_comision === 1 ? '25%' : '30%';
-                        var bono = v.bono_referido && parseFloat(v.bono_referido) > 0 ? '✓ +5%' : '-';
-                        return '<tr>' +
-                            '<td>' + v.nombre + '</td>' +
-                            '<td><span class="badge success">' + categoria + '</span></td>' +
-                            '<td>' + (v.cantidad_ventas || 0) + '</td>' +
-                            '<td>' + bono + '</td>' +
-                            '<td>$' + parseFloat(v.total_ventas || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
-                            '<td><button class="btn" onclick="APP.verDetallesVendedor(\'' + v.id + '\')" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>' +
-                        '</tr>';
-                    }).join('');
+                    var filasPromesas = vendedoresFiltrados.map(function(v) {
+                        return APP.supabase.from('vendedores').select('*').eq('referido_de', v.id).then(function(r) {
+                            var categoria = v.nivel_comision === 1 ? '25%' : '30%';
+                            var bono = v.bono_referido && parseFloat(v.bono_referido) > 0 ? '✓ +5%' : '-';
+                            var referidos = r.data ? r.data.length : 0;
+                            var referidosBadge = referidos > 0 ? '<span class="badge success">' + referidos + '</span>' : '-';
+
+                            return '<tr>' +
+                                '<td>' + v.nombre + '</td>' +
+                                '<td><span class="badge success">' + categoria + '</span></td>' +
+                                '<td>' + (v.cantidad_ventas || 0) + '</td>' +
+                                '<td>' + bono + '</td>' +
+                                '<td>' + referidosBadge + '</td>' +
+                                '<td>$' + parseFloat(v.total_ventas || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                                '<td><button class="btn" onclick="APP.verDetallesVendedor(\'' + v.id + '\')" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>' +
+                            '</tr>';
+                        });
+                    });
+
+                    Promise.all(filasPromesas).then(function(filas) {
+                        tbody.innerHTML = filas.join('');
+                    }).catch(function(e) { console.error('Error cargando referidos:', e); });
                 }).catch(function(e) { console.error(e); });
             },
 
@@ -781,8 +792,14 @@
                     if (result.error) throw result.error;
                     var v = result.data;
 
-                    APP.supabase.from('ventas').select('*').eq('id_vendedor', vendedorId).then(function(r) {
-                        var ventas = r.data || [];
+                    Promise.all([
+                        APP.supabase.from('ventas').select('*').eq('id_vendedor', vendedorId),
+                        APP.supabase.from('vendedores').select('*').eq('referido_de', vendedorId),
+                        v.referido_de ? APP.supabase.from('vendedores').select('nombre').eq('id', v.referido_de).single() : Promise.resolve({ data: null })
+                    ]).then(function(results) {
+                        var ventas = results[0].data || [];
+                        var referidos = results[1].data || [];
+                        var referidoPor = results[2].data;
 
                         var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal</h3>' +
                             '<table style="font-size: 14px;"><tbody>' +
@@ -791,8 +808,23 @@
                             '<tr><td><strong>Correo:</strong></td><td>' + (v.correo || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Celular:</strong></td><td>' + (v.celular || 'N/A') + '</td></tr>' +
                             '<tr><td><strong>Fecha Contrato:</strong></td><td>' + v.fecha_contrato + '</td></tr>' +
-                            '<tr><td><strong>Comisión:</strong></td><td>' + (v.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>' +
+                            '<tr><td><strong>Comisión:</strong></td><td>' + (v.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>';
+
+                        if (referidoPor) {
+                            html += '<tr><td><strong>Referido de:</strong></td><td>' + referidoPor.nombre + ' ✓</td></tr>';
+                        }
+
+                        html += '<tr><td><strong>Referidos:</strong></td><td>' + referidos.length + ' vendedor(es)</td></tr>' +
                             '</tbody></table></div>';
+
+                        if (referidos.length > 0) {
+                            html += '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Mis Referidos (' + referidos.length + ')</h3>' +
+                                '<table><thead><tr><th>Nombre</th><th>Comisión</th><th>Fecha Contrato</th></tr></thead><tbody>';
+                            referidos.forEach(function(ref) {
+                                html += '<tr><td>' + ref.nombre + '</td><td>' + (ref.nivel_comision === 1 ? '25%' : '30%') + '</td><td>' + ref.fecha_contrato + '</td></tr>';
+                            });
+                            html += '</tbody></table></div>';
+                        }
 
                         html += '<div><h3 style="color: #1e40af; margin-bottom: 15px;">Historial de Ventas (' + ventas.length + ')</h3>' +
                             '<table><thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead><tbody>';
@@ -817,7 +849,7 @@
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + v.nombre;
                         document.getElementById('modalBody').innerHTML = html;
                         document.getElementById('modalDetalles').classList.add('active');
-                    });
+                    }).catch(function(e) { console.error('Error cargando detalles:', e); });
                 }).catch(function(e) { console.error(e); });
             },
 
