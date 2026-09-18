@@ -1201,8 +1201,12 @@
             },
 
             actualizarGraficoProductos: function(productosData) {
-                var ctx = document.getElementById('chartProductos');
-                if (!ctx) return;
+                console.log('actualizarGraficoProductos llamado con:', productosData);
+                var canvasElement = document.getElementById('chartProductos');
+                if (!canvasElement) {
+                    console.error('Canvas #chartProductos no encontrado');
+                    return;
+                }
 
                 if (!productosData || !Array.isArray(productosData) || productosData.length === 0) {
                     console.log('No hay datos de productos para graficar');
@@ -1213,40 +1217,47 @@
                     window.chartProductosInstance.destroy();
                 }
 
-                var productos = productosData;
-                window.chartProductosInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: productos.map(function(p) { return p.nombre; }),
-                        datasets: [{
-                            label: 'Cantidad de Ventas',
-                            data: productos.map(function(p) { return p.cantidad; }),
-                            backgroundColor: '#3b82f6',
-                            borderColor: '#1e40af',
-                            borderWidth: 1,
-                            borderRadius: 4
-                        }]
-                    },
-                    options: {
-                        indexAxis: productos.length > 5 ? 'y' : 'x',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true },
-                            tooltip: {
-                                callbacks: {
-                                    afterLabel: function(context) {
-                                        var producto = productos[context.dataIndex];
-                                        return '$' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                try {
+                    var productos = productosData;
+                    var ctx = canvasElement.getContext('2d');
+
+                    window.chartProductosInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: productos.map(function(p) { return p.nombre; }),
+                            datasets: [{
+                                label: 'Cantidad de Ventas',
+                                data: productos.map(function(p) { return p.cantidad; }),
+                                backgroundColor: '#3b82f6',
+                                borderColor: '#1e40af',
+                                borderWidth: 1,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            indexAxis: productos.length > 5 ? 'y' : 'x',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true },
+                                tooltip: {
+                                    callbacks: {
+                                        afterLabel: function(context) {
+                                            var producto = productos[context.dataIndex];
+                                            return '$' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+                                        }
                                     }
                                 }
+                            },
+                            scales: {
+                                y: { beginAtZero: true }
                             }
-                        },
-                        scales: {
-                            y: { beginAtZero: true }
                         }
-                    }
-                });
+                    });
+                    console.log('Gráfico creado exitosamente');
+                } catch (e) {
+                    console.error('Error creando gráfico:', e);
+                }
             },
 
             cambiarTipoRegistro: function(tipo) {
