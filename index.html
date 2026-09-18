@@ -473,8 +473,8 @@
                 </div>
 
                 <div class="card">
-                    <h2>📊 Gráfico de Productos</h2>
-                    <div id="chartProductosContainer" style="padding: 20px 0;">
+                    <h2>📊 Distribución de Ventas por Producto</h2>
+                    <div id="chartProductosContainer" style="padding: 20px 0; position: relative; height: 400px;">
                         <p style="text-align: center; color: #999;">Cargando gráfico...</p>
                     </div>
                 </div>
@@ -1214,35 +1214,72 @@
                     return;
                 }
 
-                var colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
-                var maxCantidad = Math.max.apply(null, productosData.map(function(p) { return p.cantidad; }));
+                var colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6', '#6366f1', '#f97316'];
 
-                var html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
+                container.innerHTML = '<canvas id="chartProductosPie" width="400" height="400"></canvas>';
 
-                productosData.forEach(function(producto, index) {
-                    var porcentaje = (producto.cantidad / maxCantidad) * 100;
-                    var color = colores[index % colores.length];
+                var canvas = document.getElementById('chartProductosPie');
+                if (!canvas) {
+                    console.error('Canvas #chartProductosPie no encontrado');
+                    return;
+                }
 
-                    html += '<div style="display: flex; align-items: flex-start; gap: 16px;">' +
-                        '<div style="flex-shrink: 0; width: 140px;">' +
-                            '<p style="margin: 0 0 4px 0; font-weight: 600; color: #333; font-size: 14px;">' + producto.nombre + '</p>' +
-                            '<p style="margin: 0; font-size: 12px; color: #666;">' + producto.cantidad + ' ventas</p>' +
-                        '</div>' +
-                        '<div style="flex: 1;">' +
-                            '<div style="background: ' + color + '; height: 32px; border-radius: 6px; display: flex; align-items: center; padding: 0 12px; color: white; font-weight: 600; font-size: 13px;">' +
-                                (porcentaje > 15 ? producto.cantidad + ' ventas' : '') +
-                            '</div>' +
-                        '</div>' +
-                        '<div style="flex-shrink: 0; width: 120px; text-align: right;">' +
-                            '<p style="margin: 0 0 4px 0; font-weight: 600; color: #333; font-size: 14px;">$' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '</p>' +
-                            '<p style="margin: 0; font-size: 12px; color: #666;">Promedio: $' + producto.promedio.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '</p>' +
-                        '</div>' +
-                    '</div>';
-                });
+                if (window.chartProductosInstance) {
+                    window.chartProductosInstance.destroy();
+                }
 
-                html += '</div>';
-                container.innerHTML = html;
-                console.log('Gráfico HTML creado exitosamente');
+                try {
+                    var ctx = canvas.getContext('2d');
+                    var labels = productosData.map(function(p) { return p.nombre; });
+                    var datos = productosData.map(function(p) { return p.cantidad; });
+                    var coloresUsados = colores.slice(0, productosData.length);
+
+                    window.chartProductosInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: datos,
+                                backgroundColor: coloresUsados,
+                                borderColor: '#ffffff',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        font: { size: 13 },
+                                        padding: 15,
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            var producto = productosData[context.dataIndex];
+                                            var total = productosData.reduce(function(sum, p) { return sum + p.cantidad; }, 0);
+                                            var porcentaje = ((producto.cantidad / total) * 100).toFixed(1);
+                                            return producto.nombre + ': ' + producto.cantidad + ' ventas (' + porcentaje + '%)';
+                                        },
+                                        afterLabel: function(context) {
+                                            var producto = productosData[context.dataIndex];
+                                            return 'Ingresos: $' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log('Gráfico de torta creado exitosamente');
+                } catch (e) {
+                    console.error('Error creando gráfico:', e);
+                    container.innerHTML = '<p style="text-align: center; color: red;">Error al generar gráfico: ' + e.message + '</p>';
+                }
             },
 
             cambiarTipoRegistro: function(tipo) {
