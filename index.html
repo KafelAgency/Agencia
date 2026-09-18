@@ -599,7 +599,12 @@
                         return;
                     }
 
-                    tbody.innerHTML = vendedores.map(function(v) {
+                    var filtro = document.getElementById('filtroVendedor').value.toLowerCase();
+                    var vendedoresFiltrados = vendedores.filter(function(v) {
+                        return !filtro || v.nombre.toLowerCase().includes(filtro);
+                    });
+
+                    tbody.innerHTML = vendedoresFiltrados.map(function(v) {
                         var categoria = v.nivel_comision === 1 ? '25%' : '30%';
                         var bono = v.bono_referido && parseFloat(v.bono_referido) > 0 ? '✓ +5%' : '-';
                         return '<tr>' +
@@ -660,8 +665,76 @@
                 console.log('Cargando programadores...');
                 if (!APP.supabase) return;
 
-                var tbody = document.getElementById('programadoresTable');
-                tbody.innerHTML = '<tr><td colspan="6" class="no-data">Función en desarrollo</td></tr>';
+                APP.supabase.from('programadores').select('*').then(function(result) {
+                    if (result.error) throw result.error;
+                    var programadores = result.data || [];
+                    var tbody = document.getElementById('programadoresTable');
+
+                    if (programadores.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No hay programadores registrados</td></tr>';
+                        return;
+                    }
+
+                    var filtro = document.getElementById('filtroProgramador').value.toLowerCase();
+                    var programadoresFiltrados = programadores.filter(function(p) {
+                        return !filtro || p.nombre.toLowerCase().includes(filtro);
+                    });
+
+                    tbody.innerHTML = programadoresFiltrados.map(function(p) {
+                        var categoria = p.nivel_comision === 1 ? '25%' : '30%';
+                        var bono = p.bono_referido && parseFloat(p.bono_referido) > 0 ? '✓ +5%' : '-';
+                        return '<tr>' +
+                            '<td>' + p.nombre + '</td>' +
+                            '<td><span class="badge success">' + categoria + '</span></td>' +
+                            '<td>' + (p.cantidad_proyectos || 0) + '</td>' +
+                            '<td>' + bono + '</td>' +
+                            '<td>$' + parseFloat(p.total_ganado || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                            '<td><button class="btn" onclick="APP.verDetallesProgramador(\'' + p.id + '\')" style="padding: 6px 12px; font-size: 12px;">Ver</button></td>' +
+                        '</tr>';
+                    }).join('');
+                }).catch(function(e) { console.error(e); });
+            },
+
+            verDetallesProgramador: function(programadorId) {
+                if (!APP.supabase) return;
+
+                APP.supabase.from('programadores').select('*').eq('id', programadorId).single().then(function(result) {
+                    if (result.error) throw result.error;
+                    var p = result.data;
+
+                    APP.supabase.from('proyectos').select('*').eq('id_programador', programadorId).then(function(r) {
+                        var proyectos = r.data || [];
+
+                        var html = '<div style="margin-bottom: 20px;"><h3 style="color: #1e40af; margin-bottom: 15px;">Información Personal</h3>' +
+                            '<table style="font-size: 14px;"><tbody>' +
+                            '<tr><td><strong>Nombre:</strong></td><td>' + p.nombre + '</td></tr>' +
+                            '<tr><td><strong>Cédula:</strong></td><td>' + p.cedula + '</td></tr>' +
+                            '<tr><td><strong>Correo:</strong></td><td>' + (p.correo || 'N/A') + '</td></tr>' +
+                            '<tr><td><strong>Celular:</strong></td><td>' + (p.celular || 'N/A') + '</td></tr>' +
+                            '<tr><td><strong>Fecha Contrato:</strong></td><td>' + p.fecha_contrato + '</td></tr>' +
+                            '<tr><td><strong>Comisión:</strong></td><td>' + (p.nivel_comision === 1 ? '25%' : '30%') + '</td></tr>' +
+                            '</tbody></table></div>';
+
+                        html += '<div><h3 style="color: #1e40af; margin-bottom: 15px;">Historial de Proyectos (' + proyectos.length + ')</h3>' +
+                            '<table><thead><tr><th>Fecha</th><th>Proyecto</th><th>Monto</th><th>Estado</th></tr></thead><tbody>';
+
+                        if (proyectos.length === 0) {
+                            html += '<tr><td colspan="4" class="no-data">Sin proyectos registrados</td></tr>';
+                        } else {
+                            proyectos.forEach(function(pry) {
+                                var badge = 'pending';
+                                if (pry.estado === 'completado') badge = 'success';
+                                html += '<tr><td>' + pry.fecha_inicio + '</td><td>' + pry.nombre_proyecto + '</td><td>$' + parseFloat(pry.monto).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
+                                    '<td><span class="badge ' + badge + '">' + pry.estado + '</span></td></tr>';
+                            });
+                        }
+                        html += '</tbody></table></div>';
+
+                        document.getElementById('modalTitulo').textContent = 'Detalles de ' + p.nombre;
+                        document.getElementById('modalBody').innerHTML = html;
+                        document.getElementById('modalDetalles').classList.add('active');
+                    });
+                }).catch(function(e) { console.error(e); });
             },
 
             cargarVentas: function() {
@@ -678,17 +751,28 @@
                         return;
                     }
 
-                    tbody.innerHTML = ventas.map(function(vta) {
+                    var filtroEmpresa = document.getElementById('filtroVentasEmpresa').value.toLowerCase();
+                    var filtroVendedor = document.getElementById('filtroVentasVendedor').value;
+                    var filtroEstado = document.getElementById('filtroVentasEstado').value;
+
+                    var ventasFiltradas = ventas.filter(function(vta) {
+                        var empresaOk = !filtroEmpresa || (vta.nombre_empresa && vta.nombre_empresa.toLowerCase().includes(filtroEmpresa));
+                        var vendedorOk = !filtroVendedor || vta.id_vendedor === parseInt(filtroVendedor);
+                        var estadoOk = !filtroEstado || vta.estado_pago === filtroEstado;
+                        return empresaOk && vendedorOk && estadoOk;
+                    });
+
+                    tbody.innerHTML = ventasFiltradas.map(function(vta) {
                         var badge = 'pending';
                         if (vta.estado_pago === '100%_pago') badge = 'success';
                         if (vta.estado_pago === '40%_pago') badge = 'pending';
                         return '<tr>' +
-                            '<td>Empresa</td>' +
-                            '<td>Encargado</td>' +
-                            '<td>' + vta.descripcion_servicio + '</td>' +
+                            '<td>' + (vta.nombre_empresa || 'N/A') + '</td>' +
+                            '<td>' + (vta.nombre_encargado || 'N/A') + '</td>' +
+                            '<td>' + (vta.descripcion_servicio || 'N/A') + '</td>' +
                             '<td>$' + parseFloat(vta.monto_total).toLocaleString('es-CO', { maximumFractionDigits: 2 }) + '</td>' +
                             '<td><span class="badge ' + badge + '">' + vta.estado_pago + '</span></td>' +
-                            '<td>Vendedor</td>' +
+                            '<td>' + (vta.nombre_vendedor || 'N/A') + '</td>' +
                             '<td>' + vta.fecha_venta + '</td>' +
                         '</tr>';
                     }).join('');
@@ -709,13 +793,22 @@
                         return;
                     }
 
-                    tbody.innerHTML = clientes.map(function(c) {
+                    var filtro = document.getElementById('filtroCliente').value.toLowerCase();
+                    var clientesFiltrados = clientes.filter(function(c) {
+                        var empresa = (c.nombre_empresa || '').toLowerCase();
+                        var nombre = (c.nombre_completo || '').toLowerCase();
+                        return !filtro || empresa.includes(filtro) || nombre.includes(filtro);
+                    });
+
+                    tbody.innerHTML = clientesFiltrados.map(function(c) {
+                        var tipo = c.tipo_cliente || 'cliente';
+                        var badge = tipo === 'premium' ? 'success' : 'pending';
                         return '<tr>' +
                             '<td>' + (c.nombre_empresa || 'N/A') + '</td>' +
                             '<td>' + (c.nombre_completo || 'N/A') + '</td>' +
                             '<td>' + (c.telefono || 'N/A') + '</td>' +
-                            '<td>' + (c.redes_sociales || 'N/A') + '</td>' +
-                            '<td>' + (c.tipo_cliente || 'cliente') + '</td>' +
+                            '<td>' + (c.instagram || 'N/A') + '</td>' +
+                            '<td><span class="badge ' + badge + '">' + tipo + '</span></td>' +
                             '<td><span class="badge success">Activo</span></td>' +
                         '</tr>';
                     }).join('');
@@ -921,6 +1014,49 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Documento cargado, inicializando...');
             APP.inicializarSupabase();
+
+            // Add filter listeners
+            var filtroVendedor = document.getElementById('filtroVendedor');
+            if (filtroVendedor) {
+                filtroVendedor.addEventListener('input', function() {
+                    APP.cargarVendedores();
+                });
+            }
+
+            var filtroProgramador = document.getElementById('filtroProgramador');
+            if (filtroProgramador) {
+                filtroProgramador.addEventListener('input', function() {
+                    APP.cargarProgramadores();
+                });
+            }
+
+            var filtroCliente = document.getElementById('filtroCliente');
+            if (filtroCliente) {
+                filtroCliente.addEventListener('input', function() {
+                    APP.cargarClientes();
+                });
+            }
+
+            var filtroVentasEmpresa = document.getElementById('filtroVentasEmpresa');
+            if (filtroVentasEmpresa) {
+                filtroVentasEmpresa.addEventListener('input', function() {
+                    APP.cargarVentas();
+                });
+            }
+
+            var filtroVentasVendedor = document.getElementById('filtroVentasVendedor');
+            if (filtroVentasVendedor) {
+                filtroVentasVendedor.addEventListener('change', function() {
+                    APP.cargarVentas();
+                });
+            }
+
+            var filtroVentasEstado = document.getElementById('filtroVentasEstado');
+            if (filtroVentasEstado) {
+                filtroVentasEstado.addEventListener('change', function() {
+                    APP.cargarVentas();
+                });
+            }
         });
     </script>
 </body>
