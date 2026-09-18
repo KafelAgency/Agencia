@@ -474,8 +474,8 @@
 
                 <div class="card">
                     <h2>📊 Gráfico de Productos</h2>
-                    <div style="position: relative; height: 500px; width: 100%;">
-                        <canvas id="chartProductos"></canvas>
+                    <div id="chartProductosContainer" style="padding: 20px 0;">
+                        <p style="text-align: center; color: #999;">Cargando gráfico...</p>
                     </div>
                 </div>
 
@@ -1202,62 +1202,47 @@
 
             actualizarGraficoProductos: function(productosData) {
                 console.log('actualizarGraficoProductos llamado con:', productosData);
-                var canvasElement = document.getElementById('chartProductos');
-                if (!canvasElement) {
-                    console.error('Canvas #chartProductos no encontrado');
+                var container = document.getElementById('chartProductosContainer');
+                if (!container) {
+                    console.error('Container #chartProductosContainer no encontrado');
                     return;
                 }
 
                 if (!productosData || !Array.isArray(productosData) || productosData.length === 0) {
                     console.log('No hay datos de productos para graficar');
+                    container.innerHTML = '<p style="text-align: center; color: #999;">No hay datos de productos</p>';
                     return;
                 }
 
-                if (window.chartProductosInstance) {
-                    window.chartProductosInstance.destroy();
-                }
+                var colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+                var maxCantidad = Math.max.apply(null, productosData.map(function(p) { return p.cantidad; }));
 
-                try {
-                    var productos = productosData;
-                    var ctx = canvasElement.getContext('2d');
+                var html = '<div style="display: flex; flex-direction: column; gap: 24px;">';
 
-                    window.chartProductosInstance = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: productos.map(function(p) { return p.nombre; }),
-                            datasets: [{
-                                label: 'Cantidad de Ventas',
-                                data: productos.map(function(p) { return p.cantidad; }),
-                                backgroundColor: '#3b82f6',
-                                borderColor: '#1e40af',
-                                borderWidth: 1,
-                                borderRadius: 4
-                            }]
-                        },
-                        options: {
-                            indexAxis: productos.length > 5 ? 'y' : 'x',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: true },
-                                tooltip: {
-                                    callbacks: {
-                                        afterLabel: function(context) {
-                                            var producto = productos[context.dataIndex];
-                                            return '$' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 2 });
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: { beginAtZero: true }
-                            }
-                        }
-                    });
-                    console.log('Gráfico creado exitosamente');
-                } catch (e) {
-                    console.error('Error creando gráfico:', e);
-                }
+                productosData.forEach(function(producto, index) {
+                    var porcentaje = (producto.cantidad / maxCantidad) * 100;
+                    var color = colores[index % colores.length];
+
+                    html += '<div style="display: flex; align-items: flex-start; gap: 16px;">' +
+                        '<div style="flex-shrink: 0; width: 140px;">' +
+                            '<p style="margin: 0 0 4px 0; font-weight: 600; color: #333; font-size: 14px;">' + producto.nombre + '</p>' +
+                            '<p style="margin: 0; font-size: 12px; color: #666;">' + producto.cantidad + ' ventas</p>' +
+                        '</div>' +
+                        '<div style="flex: 1;">' +
+                            '<div style="background: ' + color + '; height: 32px; border-radius: 6px; display: flex; align-items: center; padding: 0 12px; color: white; font-weight: 600; font-size: 13px;">' +
+                                (porcentaje > 15 ? producto.cantidad + ' ventas' : '') +
+                            '</div>' +
+                        '</div>' +
+                        '<div style="flex-shrink: 0; width: 120px; text-align: right;">' +
+                            '<p style="margin: 0 0 4px 0; font-weight: 600; color: #333; font-size: 14px;">$' + producto.total.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '</p>' +
+                            '<p style="margin: 0; font-size: 12px; color: #666;">Promedio: $' + producto.promedio.toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '</p>' +
+                        '</div>' +
+                    '</div>';
+                });
+
+                html += '</div>';
+                container.innerHTML = html;
+                console.log('Gráfico HTML creado exitosamente');
             },
 
             cambiarTipoRegistro: function(tipo) {
