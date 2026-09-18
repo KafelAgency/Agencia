@@ -639,7 +639,31 @@
 
                 APP.supabase.from('vendedores').select('*').then(function(result) {
                     if (result.error) throw result.error;
-                    document.getElementById('total-vendedores').textContent = (result.data || []).length;
+                    var vendedores = result.data || [];
+                    document.getElementById('total-vendedores').textContent = vendedores.length;
+
+                    // Load top 5 vendors
+                    var topVendedores = vendedores
+                        .sort(function(a, b) { return (b.cantidad_ventas || 0) - (a.cantidad_ventas || 0); })
+                        .slice(0, 5);
+
+                    var tbody = document.getElementById('topVendedoresTable');
+                    if (topVendedores.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" class="no-data">No hay vendedores</td></tr>';
+                    } else {
+                        tbody.innerHTML = topVendedores.map(function(v) {
+                            return '<tr>' +
+                                '<td>' + v.nombre + '</td>' +
+                                '<td>' + (v.cantidad_ventas || 0) + '</td>' +
+                                '<td>$' + parseFloat(v.total_ventas || 0).toLocaleString('es-CO', { maximumFractionDigits: 0 }) + '</td>' +
+                            '</tr>';
+                        }).join('');
+                    }
+                }).catch(function(e) { console.error(e); });
+
+                APP.supabase.from('programadores').select('count', { count: 'exact' }).then(function(result) {
+                    if (result.error) throw result.error;
+                    document.getElementById('total-programadores').textContent = (result.count || 0);
                 }).catch(function(e) { console.error(e); });
 
                 APP.supabase.from('clientes').select('*').then(function(result) {
@@ -651,7 +675,7 @@
                 var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
 
                 APP.supabase.from('ventas')
-                    .select('monto_total')
+                    .select('*')
                     .gte('fecha_venta', mesActual + '-01')
                     .lt('fecha_venta', (hoy.getMonth() === 11 ? (hoy.getFullYear() + 1) : hoy.getFullYear()) + '-' + String((hoy.getMonth() + 2) % 12 || 12).padStart(2, '0') + '-01')
                     .then(function(result) {
@@ -662,7 +686,62 @@
                         document.getElementById('resumenTotalVentas').textContent = '$' + total.toLocaleString('es-CO', { maximumFractionDigits: 2 });
                         document.getElementById('resumenNumeroVentas').textContent = ventas.length;
                         document.getElementById('resumenPromedio').textContent = '$' + (total / (ventas.length || 1)).toLocaleString('es-CO', { maximumFractionDigits: 0 });
+
+                        // Calculate sales by category
+                        var categorias = {};
+                        ventas.forEach(function(v) {
+                            var cat = v.descripcion_servicio || 'Otros';
+                            categorias[cat] = (categorias[cat] || 0) + parseFloat(v.monto_total || 0);
+                        });
+
+                        APP.actualizarGraficoProductos(categorias);
                     }).catch(function(e) { console.error(e); });
+            },
+
+            actualizarGraficoProductos: function(categorias) {
+                var ctx = document.getElementById('chartProductos');
+                if (!ctx) return;
+
+                if (window.chartProductosInstance) {
+                    window.chartProductosInstance.destroy();
+                }
+
+                var labels = Object.keys(categorias);
+                var datos = Object.values(categorias);
+                var colores = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6'];
+
+                window.chartProductosInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Ventas por Categoría',
+                            data: datos,
+                            backgroundColor: colores.slice(0, labels.length),
+                            borderRadius: 4,
+                            borderSkipped: false
+                        }]
+                    },
+                    options: {
+                        indexAxis: labels.length > 3 ? 'y' : 'x',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return '$' + context.parsed.x.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { beginAtZero: true },
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
             },
 
             cargarListasSelect: function() {
