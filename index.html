@@ -435,26 +435,22 @@
             <div id="productos" class="section" style="display: none;">
                 <h1>📊 Productos Más Vendidos</h1>
 
-                <div class="stats-row">
-                    <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                        <h3 style="margin: 0; font-size: 28px;">📦</h3>
-                        <p style="margin: 8px 0 4px 0; font-size: 12px; opacity: 0.9;">Productos Únicos</p>
-                        <span id="totalProductos" class="stat-value" style="font-size: 24px; color: white;">0</span>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+                    <div style="background: #f8f9fa; border: 1px solid #e9ecef; padding: 16px; border-radius: 6px;">
+                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">Productos Únicos</p>
+                        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;" id="totalProductos">0</p>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                        <h3 style="margin: 0; font-size: 28px;">💰</h3>
-                        <p style="margin: 8px 0 4px 0; font-size: 12px; opacity: 0.9;">Total en Ventas</p>
-                        <span id="totalVentasProductos" class="stat-value" style="font-size: 24px; color: white;">$0</span>
+                    <div style="background: #f8f9fa; border: 1px solid #e9ecef; padding: 16px; border-radius: 6px;">
+                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">Total en Ventas</p>
+                        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;" id="totalVentasProductos">$0</p>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                        <h3 style="margin: 0; font-size: 28px;">📈</h3>
-                        <p style="margin: 8px 0 4px 0; font-size: 12px; opacity: 0.9;">Transacciones</p>
-                        <span id="totalTransacciones" class="stat-value" style="font-size: 24px; color: white;">0</span>
+                    <div style="background: #f8f9fa; border: 1px solid #e9ecef; padding: 16px; border-radius: 6px;">
+                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">Transacciones</p>
+                        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;" id="totalTransacciones">0</p>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 8px; text-align: center;">
-                        <h3 style="margin: 0; font-size: 28px;">💵</h3>
-                        <p style="margin: 8px 0 4px 0; font-size: 12px; opacity: 0.9;">Promedio/Venta</p>
-                        <span id="promedioVenta" class="stat-value" style="font-size: 24px; color: white;">$0</span>
+                    <div style="background: #f8f9fa; border: 1px solid #e9ecef; padding: 16px; border-radius: 6px;">
+                        <p style="margin: 0 0 8px 0; color: #666; font-size: 12px;">Promedio/Venta</p>
+                        <p style="margin: 0; font-size: 24px; font-weight: bold; color: #333;" id="promedioVenta">$0</p>
                     </div>
                 </div>
 
