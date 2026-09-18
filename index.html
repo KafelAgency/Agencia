@@ -1110,18 +1110,27 @@
 
             cargarProductos: function() {
                 console.log('Cargando productos...');
-                if (!APP.supabase) return;
+                if (!APP.supabase) {
+                    console.error('Supabase no conectado');
+                    return;
+                }
 
                 APP.supabase.from('ventas').select('*').then(function(result) {
-                    if (result.error) throw result.error;
+                    if (result.error) {
+                        console.error('Error cargando ventas:', result.error);
+                        throw result.error;
+                    }
                     var ventas = result.data || [];
+                    console.log('Ventas cargadas:', ventas.length);
 
                     if (ventas.length === 0) {
+                        console.log('No hay ventas registradas');
                         document.getElementById('productosTable').innerHTML = '<tr><td colspan="5" class="no-data">No hay ventas registradas</td></tr>';
                         document.getElementById('totalProductos').textContent = '0';
                         document.getElementById('totalVentasProductos').textContent = '$0';
                         document.getElementById('totalTransacciones').textContent = '0';
                         document.getElementById('promedioVenta').textContent = '$0';
+                        document.getElementById('topProductoCard').style.display = 'none';
                         return;
                     }
 
@@ -1155,6 +1164,7 @@
                             return p;
                         });
 
+                    console.log('Productos únicos:', productos.length);
                     var productosTop = productos.slice(0, 10);
                     var tbody = document.getElementById('productosTable');
                     tbody.innerHTML = productosTop.map(function(p, idx) {
@@ -1183,18 +1193,27 @@
                         document.getElementById('topProductoCard').style.display = 'none';
                     }
 
+                    console.log('Llamando a actualizarGraficoProductos con:', productosTop);
                     APP.actualizarGraficoProductos(productosTop);
-                }).catch(function(e) { console.error(e); });
+                }).catch(function(e) {
+                    console.error('Error en cargarProductos:', e);
+                });
             },
 
-            actualizarGraficoProductos: function(productos) {
+            actualizarGraficoProductos: function(productosData) {
                 var ctx = document.getElementById('chartProductos');
                 if (!ctx) return;
+
+                if (!productosData || !Array.isArray(productosData) || productosData.length === 0) {
+                    console.log('No hay datos de productos para graficar');
+                    return;
+                }
 
                 if (window.chartProductosInstance) {
                     window.chartProductosInstance.destroy();
                 }
 
+                var productos = productosData;
                 window.chartProductosInstance = new Chart(ctx, {
                     type: 'bar',
                     data: {
