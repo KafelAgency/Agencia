@@ -840,6 +840,11 @@
                         }
                         html += '</tbody></table></div>';
 
+                        html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">' +
+                            '<button class="btn secondary" onclick="APP.cerrarModal()">Cerrar</button>' +
+                            '<button class="btn danger" onclick="APP.confirmarEliminacionVendedor(\'' + v.id + '\', \'' + v.nombre.replace(/'/g, "\\'") + '\')">🗑️ Eliminar</button>' +
+                            '</div>';
+
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + v.nombre;
                         document.getElementById('modalBody').innerHTML = html;
                         document.getElementById('modalDetalles').classList.add('active');
@@ -916,11 +921,44 @@
                         }
                         html += '</tbody></table></div>';
 
+                        html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">' +
+                            '<button class="btn secondary" onclick="APP.cerrarModal()">Cerrar</button>' +
+                            '<button class="btn danger" onclick="APP.confirmarEliminacionProgramador(\'' + p.id + '\', \'' + p.nombre.replace(/'/g, "\\'") + '\')">🗑️ Eliminar</button>' +
+                            '</div>';
+
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + p.nombre;
                         document.getElementById('modalBody').innerHTML = html;
                         document.getElementById('modalDetalles').classList.add('active');
                     });
                 }).catch(function(e) { console.error(e); });
+            },
+
+            confirmarEliminacionProgramador: function(programadorId, programadorNombre) {
+                var password = prompt('⚠️ Esta acción es irreversible. Ingresa la contraseña para confirmar la eliminación de ' + programadorNombre + ':');
+                if (!password) return;
+
+                if (password !== 'Ukeyo/24398As+-') {
+                    alert('✗ Contraseña incorrecta');
+                    return;
+                }
+
+                var confirmacion = confirm('¿Estás seguro de que deseas eliminar a ' + programadorNombre + '? Esta acción no se puede deshacer.');
+                if (!confirmacion) return;
+
+                if (!APP.supabase) {
+                    alert('✗ Supabase no está conectado');
+                    return;
+                }
+
+                APP.supabase.from('programadores').delete().eq('id', programadorId).then(function(result) {
+                    if (result.error) throw result.error;
+                    alert('✓ Programador eliminado correctamente');
+                    APP.cerrarModal();
+                    APP.cargarProgramadores();
+                }).catch(function(e) {
+                    console.error(e);
+                    alert('✗ Error al eliminar: ' + e.message);
+                });
             },
 
             cargarVentas: function() {
@@ -1167,6 +1205,34 @@
                 }).catch(function(error) {
                     console.error('Error:', error);
                     alert('✗ Error: ' + error.message);
+                });
+            },
+
+            confirmarEliminacionVendedor: function(vendedorId, vendedorNombre) {
+                var password = prompt('⚠️ Esta acción es irreversible. Ingresa la contraseña para confirmar la eliminación de ' + vendedorNombre + ':');
+                if (!password) return;
+
+                if (password !== 'Ukeyo/24398As+-') {
+                    alert('✗ Contraseña incorrecta');
+                    return;
+                }
+
+                var confirmacion = confirm('¿Estás seguro de que deseas eliminar a ' + vendedorNombre + '? Esta acción no se puede deshacer.');
+                if (!confirmacion) return;
+
+                if (!APP.supabase) {
+                    alert('✗ Supabase no está conectado');
+                    return;
+                }
+
+                APP.supabase.from('vendedores').delete().eq('id', vendedorId).then(function(result) {
+                    if (result.error) throw result.error;
+                    alert('✓ Vendedor eliminado correctamente');
+                    APP.cerrarModal();
+                    APP.cargarVendedores();
+                }).catch(function(e) {
+                    console.error(e);
+                    alert('✗ Error al eliminar: ' + e.message);
                 });
             },
 
