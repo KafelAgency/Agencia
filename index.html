@@ -127,6 +127,14 @@
                         <h3>Ganancias (Mes)</h3>
                         <div class="value" id="total-ganancias">$0</div>
                     </div>
+                    <div class="stat-box" id="stat-lider" style="display: none; border-left-color: #f59e0b;">
+                        <h3>👑 Ganancias Líder 5%</h3>
+                        <div class="value" id="total-ganancias-lider" style="color: #f59e0b;">$0</div>
+                    </div>
+                    <div class="stat-box" id="stat-referidos" style="display: none; border-left-color: #06b6d4;">
+                        <h3>💰 Ganancias Referidos</h3>
+                        <div class="value" id="total-ganancias-referidos" style="color: #06b6d4;">$0</div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -636,6 +644,15 @@
                             '</tr>';
                         }).join('');
                     }
+
+                    // Buscar líder de vendedores
+                    var lider = vendedores.find(function(v) { return v.es_lider; });
+                    if (lider) {
+                        APP.calcularGananciasLider(lider.id, 'vendedores');
+                    }
+
+                    // Calcular ganancias por referidos
+                    APP.calcularGananciasReferidos(vendedores);
                 }).catch(function(e) { console.error(e); });
 
                 APP.supabase.from('programadores').select('count', { count: 'exact' }).then(function(result) {
@@ -673,6 +690,89 @@
 
                         APP.actualizarGraficoProductos(categorias);
                     }).catch(function(e) { console.error(e); });
+            },
+
+            calcularGananciasLider: function(liderVendedorId, tipo) {
+                console.log('Calculando ganancias de líder...');
+                if (!APP.supabase) return;
+
+                var hoy = new Date();
+                var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
+                // Obtener todos los vendedores del líder
+                APP.supabase.from('vendedores').select('id').eq('referido_de', liderVendedorId).then(function(result) {
+                    var vendedoresDelLider = result.data ? result.data.map(function(v) { return v.id; }) : [];
+                    vendedoresDelLider.push(liderVendedorId); // Incluir al líder mismo
+
+                    // Obtener ventas de todos los vendedores del líder en este mes
+                    APP.supabase.from('ventas')
+                        .select('*')
+                        .in('id_vendedor', vendedoresDelLider)
+                        .gte('fecha_venta', mesActual + '-01')
+                        .lt('fecha_venta', (hoy.getMonth() === 11 ? (hoy.getFullYear() + 1) : hoy.getFullYear()) + '-' + String((hoy.getMonth() + 2) % 12 || 12).padStart(2, '0') + '-01')
+                        .then(function(r) {
+                            if (r.error) throw r.error;
+                            var ventas = r.data || [];
+                            var totalVentas = ventas.reduce(function(sum, v) { return sum + parseFloat(v.monto_total || 0); }, 0);
+                            var gananciaLider = totalVentas * 0.05; // 5% para el líder
+
+                            document.getElementById('stat-lider').style.display = 'block';
+                            document.getElementById('total-ganancias-lider').textContent = '$' + gananciaLider.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                            console.log('Ganancias del líder (5%):', gananciaLider);
+                        }).catch(function(e) { console.error('Error calculando ganancias del líder:', e); });
+                }).catch(function(e) { console.error('Error buscando vendedores del líder:', e); });
+            },
+
+            calcularGananciasReferidos: function(vendedores) {
+                console.log('Calculando ganancias por referidos...');
+                if (!APP.supabase) return;
+
+                var hoy = new Date();
+                var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
+                var gananciasReferidosPorVendedor = {};
+
+                // Para cada vendedor, calcular ganancias de sus referidos
+                var promesas = vendedores.map(function(vendedor) {
+                    return new Promise(function(resolve) {
+                        APP.supabase.from('vendedores')
+                            .select('id')
+                            .eq('referido_de', vendedor.id)
+                            .then(function(result) {
+                                var referidos = result.data ? result.data.map(function(r) { return r.id; }) : [];
+                                if (referidos.length === 0) {
+                                    resolve(0);
+                                    return;
+                                }
+
+                                // Obtener ventas de los referidos
+                                APP.supabase.from('ventas')
+                                    .select('*')
+                                    .in('id_vendedor', referidos)
+                                    .gte('fecha_venta', mesActual + '-01')
+                                    .lt('fecha_venta', (hoy.getMonth() === 11 ? (hoy.getFullYear() + 1) : hoy.getFullYear()) + '-' + String((hoy.getMonth() + 2) % 12 || 12).padStart(2, '0') + '-01')
+                                    .then(function(r) {
+                                        var ventas = r.data || [];
+                                        var totalVentas = ventas.reduce(function(sum, v) { return sum + parseFloat(v.monto_total || 0); }, 0);
+                                        var ganancia5Porciento = totalVentas * 0.05; // 5% por referidos
+
+                                        if (ganancia5Porciento > 0) {
+                                            gananciasReferidosPorVendedor[vendedor.nombre] = ganancia5Porciento;
+                                        }
+                                        resolve(ganancia5Porciento);
+                                    }).catch(function(e) { console.error(e); resolve(0); });
+                            }).catch(function(e) { console.error(e); resolve(0); });
+                    });
+                });
+
+                Promise.all(promesas).then(function(ganancias) {
+                    var totalGananciasReferidos = ganancias.reduce(function(sum, g) { return sum + (g || 0); }, 0);
+                    if (totalGananciasReferidos > 0) {
+                        document.getElementById('stat-referidos').style.display = 'block';
+                        document.getElementById('total-ganancias-referidos').textContent = '$' + totalGananciasReferidos.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                        console.log('Ganancias totales por referidos:', totalGananciasReferidos);
+                    }
+                }).catch(function(e) { console.error('Error en calcularGananciasReferidos:', e); });
             },
 
             actualizarGraficoProductos: function(categorias) {
@@ -839,6 +939,14 @@
                             html += '</tbody></table></div>';
                         }
 
+                        if (v.es_lider) {
+                            html += '<div style="margin-bottom: 20px; background: #fffbeb; padding: 16px; border-radius: 8px; border-left: 4px solid #f59e0b;">' +
+                                '<h3 style="color: #f59e0b; margin: 0 0 12px 0;">👑 Ganancias del Líder</h3>' +
+                                '<p style="margin: 0 0 8px 0; color: #333; font-size: 14px;"><strong>5% de todas las ventas del equipo (Mes Actual)</strong></p>' +
+                                '<p id="liderGanancias_' + v.id + '" style="margin: 0; font-size: 18px; font-weight: bold; color: #f59e0b;">Calculando...</p>' +
+                            '</div>';
+                        }
+
                         html += '<div><h3 style="color: #1e40af; margin-bottom: 15px;">Historial de Ventas (' + ventas.length + ')</h3>' +
                             '<table><thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th></tr></thead><tbody>';
 
@@ -866,7 +974,40 @@
                         document.getElementById('modalTitulo').textContent = 'Detalles de ' + v.nombre;
                         document.getElementById('modalBody').innerHTML = html;
                         document.getElementById('modalDetalles').classList.add('active');
+
+                        if (v.es_lider) {
+                            APP.calcularGananciasLiderEnModal(v.id);
+                        }
                     }).catch(function(e) { console.error('Error cargando detalles:', e); });
+                }).catch(function(e) { console.error(e); });
+            },
+
+            calcularGananciasLiderEnModal: function(liderVendedorId) {
+                if (!APP.supabase) return;
+
+                var hoy = new Date();
+                var mesActual = hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+
+                APP.supabase.from('vendedores').select('id').eq('referido_de', liderVendedorId).then(function(result) {
+                    var vendedoresDelLider = result.data ? result.data.map(function(v) { return v.id; }) : [];
+                    vendedoresDelLider.push(liderVendedorId);
+
+                    APP.supabase.from('ventas')
+                        .select('*')
+                        .in('id_vendedor', vendedoresDelLider)
+                        .gte('fecha_venta', mesActual + '-01')
+                        .lt('fecha_venta', (hoy.getMonth() === 11 ? (hoy.getFullYear() + 1) : hoy.getFullYear()) + '-' + String((hoy.getMonth() + 2) % 12 || 12).padStart(2, '0') + '-01')
+                        .then(function(r) {
+                            if (r.error) throw r.error;
+                            var ventas = r.data || [];
+                            var totalVentas = ventas.reduce(function(sum, v) { return sum + parseFloat(v.monto_total || 0); }, 0);
+                            var gananciaLider = totalVentas * 0.05;
+
+                            var elemento = document.getElementById('liderGanancias_' + liderVendedorId);
+                            if (elemento) {
+                                elemento.textContent = '$' + gananciaLider.toLocaleString('es-CO', { maximumFractionDigits: 0 });
+                            }
+                        }).catch(function(e) { console.error('Error calculando ganancias del líder en modal:', e); });
                 }).catch(function(e) { console.error(e); });
             },
 
